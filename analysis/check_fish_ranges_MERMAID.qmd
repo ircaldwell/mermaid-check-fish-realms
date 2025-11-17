@@ -1,0 +1,158 @@
+---
+title: "Checking Fish Species Realms with MERMAID"
+author: "Iain R. Caldwell"
+date: 11/14/2025
+format: 
+  html: #for website
+    embed-resources: true
+editor: visual
+toc: true
+title-block-banner: "#f0f3f5"
+title-block-banner-color: "black"
+include-after-body: "footer.html"
+---
+
+## Checking fish realms
+
+The following code checks to see whether an observation of a fish species (or higher taxa) at a given location matches expectations based on known ranges of that taxa. The code assigns a realm to each location (latitude and longitude) provided then checks to see whether that realm matches expectations of the fish taxa based on the MERMAID fish attribute database. The code then saves a copy of the data with columns for the fish name, latitude, longitude, realm for the geographic location, realms within the known range (according to MERMAID), and whether the observation realm matches the known range (yes or no).
+
+------------------------------------------------------------------------
+
+### Loading packages and necessary files
+
+```{r}
+#| label: Load packages
+#| warning: false
+rm(list = ls()) #remove past stored objects
+options(scipen = 999) #turn off scientific notation
+
+####  Load packages and libraries ####
+## If this is the first time using mermaidr, install the package through "remotes"
+# install.packages("remotes")
+# remotes::install_github("data-mermaid/mermaidr")
+# install.packages("tidyverse")
+
+library(mermaidr) #package to download data from datamermaid.org
+library(tidyverse) #package that makes it easier to work with data
+library(DT) #for visualizing data tables
+library(sf) #working with MEOW geojson
+library(stringr)
+
+#Open the marine ecosystems of the world dataset - used to assign geographic realms
+## WCMC MEOW + PPOW as GeoJSON ------------------------------
+wcmc_url <- paste0(
+  "https://data-gis.unep-wcmc.org/server/rest/services/",
+  "WCMC036_MEOW_PPOW_2007_2012/MapServer/0/query",
+  "?where=1%3D1&outFields=*&f=geojson"
+)
+
+meow_ppow <- st_read(wcmc_url)
+
+# Filter to MEOW only (optional but recommended)
+realm_only <- meow_ppow %>% 
+  filter(type == "MEOW") %>% 
+  select(realm)
+
+#Turn off s2 - spherical geometries (to avoid edge-crossing error)
+sf_use_s2(FALSE)
+
+#Fix geometries
+#realm_only <- st_make_valid(realm_only)
+```
+
+------------------------------------------------------------------------
+
+### Setting up test data
+
+This section is where the observations of fish at given locations should be loaded. The code expects a CSV with a minimum of three columns representing the fish name, latitude, and longitude. The expected column names for those three columns are "Fish name", "Latitude", and "Longitude"
+
+```{r}
+#| label: Set up test data
+#| warning: false
+
+#Load the observations here
+fishObsFilename <- "" #replace the blank here with the location and name of the file
+
+#If the file exists then load it, otherwise load test data
+if(file.exists(fishObsFilename)) {
+  fishObsTBL <- read_csv(file = fishObsFilename)
+  message("Observation file loaded")
+} else {
+  message("Filename not found - loading test data instead")
+  fishObsTBL <- tibble(`Fish name` = c("Abudefduf saxatilis",
+                                       "Abudefduf abdominalis"),
+                       Latitude = c(10.57752, 10.83658),
+                       Longitude = c(72.62868, 72.18803))
+}
+
+#View the data
+datatable(fishObsTBL %>%
+            select(`Fish name`, Latitude, Longitude))
+```
+
+------------------------------------------------------------------------
+
+### Assign realms to each location
+
+```{r}
+#| label: Assign realms to locations
+#| warning: false
+
+# Convert observations to an sf object -----------------------
+# IMPORTANT: coords = c(x, y) = c(Longitude, Latitude)
+fish_sf <- fishObsTBL %>% 
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = FALSE)
+
+# Spatial join: assign realm to each point then drop geometry 
+# This uses st_intersects by default (points-in-polygons)
+fish_with_realm <- sf::st_join(fish_sf, realm_only) %>% 
+  st_drop_geometry() %>% 
+  rename(realm_obs = realm)
+```
+
+------------------------------------------------------------------------
+
+### Check if observation realm matches MERMAID
+
+```{r}
+#| label: Check if observation realm matches MERMAID fish attribute database
+#Get fish attribute data from MERMAID
+mermaidFishSppTBL <- mermaidr::mermaid_get_reference("fishspecies")
+
+#Merge with the observations
+fish_check_realm <- fish_with_realm %>% 
+  left_join(mermaidFishSppTBL %>%
+              select(species, regions) %>% 
+              rename(`Fish name` = species,
+                     realm_exp = regions),
+            by = "Fish name") %>% 
+  mutate(match_realm = if_else(!is.na(realm_obs) &
+                                !is.na(realm_exp) &
+                                str_detect(string = realm_exp,
+                                           pattern = fixed(realm_obs)),
+                              "yes", "no"))
+
+```
+
+------------------------------------------------------------------------
+
+### Return output file
+
+The output file returns a CSV (saved in the same folder as the code) with the original data plus additional columns indicating the realm for each observation ("realm_obs"), the realms expected from the MERMAID database ("realm_exp"), and whether the observation is inside the expected range or not ("match_realm"). The species names with those additional columns are also shown as an interactive table.
+
+```{r}
+#| label: Return result - input file plus realms (observed and expected) and whether there is a match
+
+if(file.exists(fishObsFilename)) {
+  fishOutFilename <- paste0(gsub(pattern = ".csv", replacement = "", x = fishObsFilename),
+                            "_realm_check.csv")
+} else {
+  fishOutFilename <- "test_check_realm.csv"
+}
+
+write_csv(x = fish_check_realm, file = fishOutFilename)
+
+#View the data
+datatable(fish_check_realm %>%
+            select(`Fish name`, realm_obs, realm_exp, match_realm))
+```

@@ -1,0 +1,15 @@
+---
+title: "Welcome to the index for checking fish realms"
+format: 
+  html: #for website
+    embed-resources: true
+editor: visual
+---
+
+This site is an index for checking fish realms.
+
+-   Go to the ["Check fish ranges" rendered quarto file](check_fish_ranges_MERMAID.html).
+
+-   Go to the [Basic R shiny app](https://iainmermaid.shinyapps.io/Check_fish_realms_with_MERMAID/).
+
+-   Repo: <https://github.com/ircaldwell/mermaid-check-fish-realms>

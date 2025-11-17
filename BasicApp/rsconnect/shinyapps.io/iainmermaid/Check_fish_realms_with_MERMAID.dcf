@@ -1,0 +1,10 @@
+name: Check_fish_realms_with_MERMAID
+title: Check_fish_realms_with_MERMAID
+username: iainmermaid
+account: iainmermaid
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16091741
+bundleId: 11191752
+url: https://iainmermaid.shinyapps.io/Check_fish_realms_with_MERMAID/
+version: 1
