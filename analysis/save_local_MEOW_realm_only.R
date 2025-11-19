@@ -15,6 +15,10 @@ meow_ppow <- sf::st_read(wcmc_url)
 realm_only <- meow_ppow %>%
   dplyr::filter(type == "MEOW") %>%
   dplyr::select(realm) %>%
-  sf::st_make_valid()
+  sf::st_make_valid() %>% 
+  group_by(realm) %>% 
+  summarise(geometry = st_union(geometry), .groups = "drop") %>% 
+  st_simplify(dTolerance = 0.01, preserveTopology = TRUE)
 
-saveRDS(realm_only, "data/realm_only.rds")
+saveRDS(realm_only, "realm_only.rds")
+st_write(realm_only, "realm_only.geojson")

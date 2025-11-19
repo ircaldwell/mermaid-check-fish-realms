@@ -12,4 +12,6 @@ This site is an index for checking fish realms.
 
 -   Go to the [Basic R shiny app](https://iainmermaid.shinyapps.io/Check_fish_realms_with_MERMAID/) (published).
 
+-   Here is a webapp created with help from claude.ai: [Fish Realm Checker](ClaudeDrivenFishRealmCheckerWebapp.html)
+
 -   Repo: <https://github.com/ircaldwell/mermaid-check-fish-realms>
