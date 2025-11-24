@@ -388,7 +388,17 @@
             const sources = [
                 { 
                     url: './data/realm_only.geojson', 
-                    name: 'local file',
+                    name: 'local file (relative)',
+                    needsFiltering: false 
+                },
+                { 
+                    url: 'data/realm_only.geojson', 
+                    name: 'local file (no dot)',
+                    needsFiltering: false 
+                },
+                { 
+                    url: '/mermaid-check-fish-realms/data/realm_only.geojson', 
+                    name: 'local file (absolute)',
                     needsFiltering: false 
                 },
                 { 
@@ -470,21 +480,60 @@
         // Load MERMAID regions reference data
         async function loadRegionsData() {
             try {
-                showStatus('Loading MERMAID regions reference...', 'info');
-                const response = await fetch('https://api.datamermaid.org/v1/regions/');
-                const data = await response.json();
+                // Try local file first for speed
+                // Try both relative and absolute paths for GitHub Pages compatibility
+                const possiblePaths = [
+                    './data/mermaid_regions_lookup.json',
+                    'data/mermaid_regions_lookup.json',
+                    '/mermaid-check-fish-realms/data/mermaid_regions_lookup.json'
+                ];
                 
-                // Create a lookup map of region ID to region name
-                regionsData = {};
-                data.results.forEach(region => {
-                    regionsData[region.id] = region.name;
-                });
+                let loaded = false;
+                for (const path of possiblePaths) {
+                    try {
+                        const response = await fetch(path);
+                        if (!response.ok) continue;
+                        
+                        const text = await response.text();
+                        // Check if we got HTML error page instead of JSON
+                        if (text.trim().startsWith('<')) {
+                            continue;
+                        }
+                        
+                        regionsData = JSON.parse(text);
+                        console.log('Regions data loaded from local file:', Object.keys(regionsData).length, 'regions');
+                        loaded = true;
+                        break;
+                    } catch (error) {
+                        console.log(`Failed to load from ${path}:`, error.message);
+                        continue;
+                    }
+                }
                 
-                console.log('Regions data loaded:', Object.keys(regionsData).length, 'regions');
+                if (!loaded) {
+                    console.log('Local regions file not found in any path, loading from API...');
+                    const response = await fetch('https://api.datamermaid.org/v1/choices/');
+                    const data = await response.json();
+                    
+                    // Find the regions choice
+                    const regionsChoice = data.results.find(choice => choice.name === 'regions');
+                    
+                    if (regionsChoice && regionsChoice.data) {
+                        // Create a lookup map of region ID to region name
+                        regionsData = {};
+                        regionsChoice.data.forEach(region => {
+                            regionsData[region.id] = region.name;
+                        });
+                        console.log('Regions data loaded from API:', Object.keys(regionsData).length, 'regions');
+                    } else {
+                        throw new Error('Regions data not found in choices');
+                    }
+                }
+                
                 return true;
             } catch (error) {
                 console.error('Error loading regions data:', error);
-                showStatus('Error loading MERMAID regions. Please refresh the page.', 'error');
+                showStatus('Error loading MERMAID regions: ' + error.message, 'error');
                 return false;
             }
         }
@@ -613,8 +662,13 @@
         
         // Run realm checks
         document.getElementById('runBtn').addEventListener('click', async function() {
-            if (!uploadedData || !fishSpeciesData || !meowData) {
-                showStatus('Data not fully loaded. Please wait...', 'error');
+            if (!uploadedData) {
+                showStatus('Please upload a CSV file first.', 'error');
+                return;
+            }
+            
+            if (!fishSpeciesData || !meowData || !regionsData) {
+                showStatus('Data not fully loaded. Please wait and try again...', 'error');
                 return;
             }
             
