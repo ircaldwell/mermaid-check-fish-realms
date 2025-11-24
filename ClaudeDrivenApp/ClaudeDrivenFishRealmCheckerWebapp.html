@@ -457,6 +457,10 @@
                 
                 fishSpeciesData = allSpecies;
                 console.log('Fish species data loaded:', fishSpeciesData.length, 'species');
+                // Log first species to see the structure
+                if (fishSpeciesData.length > 0) {
+                    console.log('Sample fish species data structure:', fishSpeciesData[0]);
+                }
                 showStatus('MERMAID database loaded successfully!', 'success');
                 return true;
             } catch (error) {
@@ -617,9 +621,12 @@
                 const realmObs = getRealmForCoordinates(lat, lon);
                 
                 // Find species in MERMAID database
-                const species = fishSpeciesData.find(s => 
-                    s.name.toLowerCase() === fishName.toLowerCase()
-                );
+                // The mermaidr R package uses 'species' field, but the API might use 'name'
+                // Check both to be safe
+                const species = fishSpeciesData.find(s => {
+                    const speciesName = s.name || s.species || '';
+                    return speciesName.toLowerCase() === fishName.toLowerCase();
+                });
                 
                 const realmExp = species ? species.regions : null;
                 
